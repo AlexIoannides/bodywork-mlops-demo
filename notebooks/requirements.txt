@@ -1,0 +1,9 @@
+boto3==1.16.50
+Flask==1.1.2
+numpy==1.19.5
+pandas==1.2.0
+scikit-learn==0.24.0
+jupyterlab==3.0.3
+seaborn==0.11.1
+requests==2.25.1
+joblib==0.17.0
