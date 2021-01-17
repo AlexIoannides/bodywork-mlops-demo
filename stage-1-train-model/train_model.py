@@ -7,7 +7,6 @@ This module defines what will happen in 'stage-1-train-model':
 """
 import re
 from datetime import datetime, date
-from urllib.request import urlopen
 from typing import Tuple
 
 import boto3 as aws
@@ -39,7 +38,7 @@ def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
         file_date = datetime.strptime(date_string, '%Y-%m-%d').date()
         return file_date
 
-    print(f'downloading training data from s3://{aws_bucket}/datasets')
+    print(f'downloading latest training data from s3://{aws_bucket}/datasets')
     try:
         s3_client = aws.client('s3')
         s3_objects = s3_client.list_objects(Bucket=aws_bucket, Prefix='datasets/')
