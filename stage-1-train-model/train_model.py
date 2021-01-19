@@ -31,14 +31,27 @@ def main() -> None:
 
 
 def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
-    """Get latest dataset from AWS S3 bucket."""
+    """Get all available data from AWS S3 bucket.
+    
+    This function reads all CSV files from an AWS S3 bucket and then
+    combines them into a single Pandas DataFrame object.
+    """
     def _date_from_object_key(key: str) -> date:
         """Extract date from S3 file object key."""
         date_string = re.findall('20[2-9][0-9]-[0-1][0-9]-[0-3][0-9]', key)[0]
         file_date = datetime.strptime(date_string, '%Y-%m-%d').date()
         return file_date
 
-    print(f'downloading latest training data from s3://{aws_bucket}/datasets')
+    def _load_dataset_from_aws_s3(s3_obj_key: str) -> pd.DataFrame:
+        """Load CSV datafile from AWS S3 into DataFrame."""
+        object_data = s3_client.get_object(
+            Bucket=aws_bucket,
+            Key=s3_obj_key
+        )
+        return pd.read_csv(object_data['Body'])
+
+        
+    print(f'downloading all available training data from s3://{aws_bucket}/datasets')
     try:
         s3_client = aws.client('s3')
         s3_objects = s3_client.list_objects(Bucket=aws_bucket, Prefix='datasets/')
@@ -46,14 +59,15 @@ def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
             (obj['Key'], _date_from_object_key(obj['Key']))
             for obj in s3_objects['Contents']
         ]
-        latest_dataset_obj = sorted(object_keys_and_dates, key=lambda e: e[1])[-1]
-        latest_dataset_obj_key = latest_dataset_obj[0]
-        object_data = s3_client.get_object(Bucket=aws_bucket, Key=latest_dataset_obj_key)
-        dataset = pd.read_csv(object_data['Body'])
-        dataset_date = latest_dataset_obj[1]
+        ordered_dataset_objs = sorted(object_keys_and_dates, key=lambda e: e[1])
+        dataset = pd.concat(
+            _load_dataset_from_aws_s3(obj_key[0])
+            for obj_key in ordered_dataset_objs
+        )
     except ClientError as e:
         print(f'failed to download training data from s3://{aws_bucket}/datasets')
-    return (dataset, dataset_date)
+    most_recent_date = object_keys_and_dates[-1][1]
+    return (dataset, most_recent_date)
 
 
 def model_metrics(y_actual, y_predicted) -> pd.DataFrame:
