@@ -26,8 +26,8 @@ def main() -> None:
     """Main script to be executed."""
     data, data_date = download_latest_dataset(AWS_S3_BUCKET)
     model, metrics = train_model(data)
-    persist_model(model, data_date)
-    persist_metrics(metrics, data_date)
+    persist_model(model, data_date, AWS_S3_BUCKET)
+    persist_metrics(metrics, data_date, AWS_S3_BUCKET)
 
 
 def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
@@ -50,7 +50,6 @@ def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
         )
         return pd.read_csv(object_data['Body'])
 
-        
     print(f'downloading all available training data from s3://{aws_bucket}/datasets')
     try:
         s3_client = aws.client('s3')
@@ -101,7 +100,7 @@ def train_model(data:pd.DataFrame) -> Tuple[BaseEstimator, pd.DataFrame]:
     return (ols_regressor, metrics)
 
 
-def persist_model(model: BaseEstimator, data_date: date) -> None:
+def persist_model(model: BaseEstimator, data_date: date, aws_bucket: str) -> None:
     """Upload trained model to AWS S3."""
     model_filename = f'regressor-{data_date}.joblib'
     dump(model, model_filename)
@@ -109,15 +108,15 @@ def persist_model(model: BaseEstimator, data_date: date) -> None:
         s3_client = aws.client('s3')
         s3_client.upload_file(
             model_filename,
-            AWS_S3_BUCKET,
+            aws_bucket,
             f'models/{model_filename}'
         )
-        print(f'uploaded {model_filename} to s3://{AWS_S3_BUCKET}/models/')
+        print(f'uploaded {model_filename} to s3://{aws_bucket}/models/')
     except ClientError:
         print('could not upload model to S3 - check AWS credentials')
 
 
-def persist_metrics(metrics: pd.DataFrame, data_date: date) -> None:
+def persist_metrics(metrics: pd.DataFrame, data_date: date, aws_bucket: str) -> None:
     """Upload model metrics to AWS S3."""
     metrics_filename = f'regressor-{data_date}.csv'
     metrics.to_csv(metrics_filename, header=True, index=False)
@@ -125,10 +124,10 @@ def persist_metrics(metrics: pd.DataFrame, data_date: date) -> None:
         s3_client = aws.client('s3')
         s3_client.upload_file(
             metrics_filename,
-            AWS_S3_BUCKET,
+            aws_bucket,
             f'model-metrics/{metrics_filename}'
         )
-        print(f'uploaded {metrics_filename} to s3://{AWS_S3_BUCKET}/model-metrics/')
+        print(f'uploaded {metrics_filename} to s3://{aws_bucket}/model-metrics/')
     except ClientError:
         print('could not upload model metrics to S3 - check AWS credentials')
 
