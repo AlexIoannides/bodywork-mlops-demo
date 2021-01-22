@@ -77,8 +77,8 @@ def model_metrics(y_actual, y_predicted) -> pd.DataFrame:
     metrics_record = pd.DataFrame({
         'date': [date.today()],
         'MAPE': [mape],
-        'R2': [r_squared],
-        'MR': [max_residual]
+        'r_squared': [r_squared],
+        'max_residual': [max_residual]
     })
     return metrics_record
 
