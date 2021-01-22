@@ -9,12 +9,14 @@ This module defines what will happen in 'stage-4-test-model-scoring-service':
 import re
 from datetime import date, datetime
 from io import BytesIO
+from time import time
 from typing import Dict, Tuple
 
 import boto3 as aws
 import pandas as pd
 import requests
 from botocore.exceptions import ClientError
+from requests.exceptions import ConnectionError, Timeout
 
 AWS_S3_BUCKET = 'bodywork-ml-ops-project'
 MODEL_SCORING_SERVICE_URL = 'http://bodywork-mlops-demo--stage-2-serve-model:5000/score/v1'
@@ -56,32 +58,51 @@ def download_latest_data_file(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
 
 def generate_model_test_results(url: str, test_data: pd.DataFrame) -> pd.DataFrame:
     """Get test results for all test data."""
-    def _get_model_score(url: str, features: Dict[str, float]) -> float:
+    def get_model_score_timed(
+        url: str,
+        features: Dict[str, float]
+    ) -> Tuple[float, float]:
         """Request score from REST API for a single instance of data."""
         session = requests.Session()
         session.mount(url, requests.adapters.HTTPAdapter(max_retries=3))
-        response = session.post(url, json=features)
-        return response.json()['prediction']
+        start_time = time()
+        try:
+            response = session.post(url, json=features)
+            time_taken_to_respond = time() - start_time
+            if response.ok:
+                return (response.json()['prediction'], time_taken_to_respond)
+            else:
+                return (-1, time_taken_to_respond)
+        except (ConnectionError, Timeout):
+            return (-1, -1)
 
     def _analyse_model_score(score: float, label: float) -> Tuple[float, float, float]:
         """Compute performance metrics for model score."""
         absolute_percentage_error = abs(score / label - 1)
         return (score, label, absolute_percentage_error)
 
-    def _single_test_result(X: float, label: float) -> Tuple[float, float, float]:
-        score = _get_model_score(url, {'X': X})
-        test_result = _analyse_model_score(score, label)
-        return test_result
+    def _single_test_result(X: float, label: float) -> Tuple[float, float, float, float]:
+        score, response_time = get_model_score_timed(url, {'X': X})
+        test_result = analyse_model_score(score, label)
+        return (*test_result, response_time)
 
     test_data = [_single_test_result(row.X, row.y) for row in test_data.itertuples()]
-    return pd.DataFrame(test_data, columns=['score', 'label', 'APE'])
+    return pd.DataFrame(test_data, columns=['score', 'label', 'APE', 'response_time'])
 
 
 def compute_test_metrics(test_results: pd.DataFrame, results_date: date) -> pd.DataFrame:
     MAPE = test_results.APE.mean()
-    R2 = test_results.score.corr(test_results.label)
-    MR = test_results.APE.max()
-    return pd.DataFrame({'date': [results_date], 'MAPE': [MAPE], 'R2': R2, 'MR': [MR]})
+    r_squared = test_results.score.corr(test_results.label)
+    max_residual = test_results.APE.max()
+    mean_response_time = test_results.response_time.mean()
+    results_record = pd.DataFrame({
+        'date': [results_date],
+        'MAPE': [MAPE],
+        'r_squared': [r_squared],
+        'max_residual': [max_residual],
+        'mean_response_time': [mean_response_time]
+    })
+    return results_record
 
 
 def persist_test_metrics(
