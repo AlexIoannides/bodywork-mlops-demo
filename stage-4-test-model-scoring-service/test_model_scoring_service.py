@@ -83,7 +83,7 @@ def generate_model_test_results(url: str, test_data: pd.DataFrame) -> pd.DataFra
 
     def _single_test_result(X: float, label: float) -> Tuple[float, float, float, float]:
         score, response_time = get_model_score_timed(url, {'X': X})
-        test_result = analyse_model_score(score, label)
+        test_result = _analyse_model_score(score, label)
         return (*test_result, response_time)
 
     test_data = [_single_test_result(row.X, row.y) for row in test_data.itertuples()]
