@@ -75,6 +75,7 @@ def model_metrics(y_actual, y_predicted) -> pd.DataFrame:
     r_squared = r2_score(y_actual, y_predicted)
     max_residual = max_error(y_actual, y_predicted)
     metrics_record = pd.DataFrame({
+        'date': [date.today()],
         'MAPE': [mape],
         'R2': [r_squared],
         'MR': [max_residual]

@@ -25,10 +25,11 @@ def main() -> None:
 
 def generate_dataset(alpha: float, beta: float, sigma: float, n: int) -> pd.DataFrame:
     """Create synthetic regression data using linear model with Gaussian noise."""
+    datestr = np.full(n, str(date.today()))
     X = np.random.uniform(0, 100, n)
     epsilon = np.random.normal(0, 1, n)
     y = alpha + beta * X + sigma * epsilon
-    dataset = pd.DataFrame({'y': y, 'X': X})
+    dataset = pd.DataFrame({'date': datestr, 'y': y, 'X': X})
     return dataset.query('y >= 0')
 
 
