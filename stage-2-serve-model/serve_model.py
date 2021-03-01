@@ -20,19 +20,23 @@ The expected response should be,
     "model_info": "LinearRegression()"
 }
 """
+import logging
+import os
 import re
+import sys
 from datetime import datetime, date
 from io import BytesIO
 from typing import Tuple
 
 import boto3 as aws
 import numpy as np
+import sentry_sdk
 from botocore.exceptions import ClientError
 from flask import Flask, jsonify, make_response, request, Response
 from joblib import load
 from sklearn.base import BaseEstimator
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 
 app = Flask(__name__)
 
@@ -45,7 +49,7 @@ def download_latest_model(aws_bucket: str) -> Tuple[BaseEstimator, date]:
         file_date = datetime.strptime(date_string, '%Y-%m-%d').date()
         return file_date
 
-    print(f'downloading latest model data from s3://{aws_bucket}/models')
+    log.info(f'downloading latest model data from s3://{aws_bucket}/models')
     try:
         s3_client = aws.client('s3')
         s3_objects = s3_client.list_objects(Bucket=aws_bucket, Prefix='models/')
@@ -58,8 +62,9 @@ def download_latest_model(aws_bucket: str) -> Tuple[BaseEstimator, date]:
         object_data = s3_client.get_object(Bucket=aws_bucket, Key=latest_model_obj_key)
         model = load(BytesIO(object_data['Body'].read()))
         dataset_date = latest_model_obj[1]
-    except ClientError:
-        print(f'failed to download model from s3://{aws_bucket}/models')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError(f'failed to download model from s3://{aws_bucket}/models')
     return (model, dataset_date)
 
 
@@ -73,8 +78,40 @@ def score_data_instance() -> Response:
     return make_response(response_data)
 
 
+def configure_logger() -> logging.Logger:
+    """Configure a logger that will write to stdout."""
+    log_handler = logging.StreamHandler(sys.stdout)
+    log_format = logging.Formatter(
+        '%(asctime)s - '
+        '%(levelname)s - '
+        '%(module)s.%(funcName)s - '
+        '%(message)s'
+    )
+    log_handler.setFormatter(log_format)
+    log = logging.getLogger(__name__)
+    log.addHandler(log_handler)
+    log.setLevel(logging.INFO)
+    return log
+
+
+def get_sentry_dsn() -> str:
+    """Get Sentry DSN from SENTRY_DSN environment variable."""
+    sentry_dsn = os.environ.get('SENTRY_DSN')
+    if sentry_dsn:
+        return sentry_dsn
+    else:
+        raise RuntimeError('cannot find SENTRY_DSN environment variable')
+
+
 if __name__ == '__main__':
-    model, model_date = download_latest_model(AWS_S3_BUCKET)
-    print(f'loaded model={model} trained on {model_date}')
-    print('starting API server')
-    app.run(host='0.0.0.0', port=5000)
+    sentry_sdk.init(get_sentry_dsn(), traces_sample_rate=1.0)
+    sentry_sdk.set_tag('stage', 'stage-2-serve-model')
+    try:
+        log = configure_logger()
+        model, model_date = download_latest_model(AWS_S3_BUCKET)
+        log.info(f'loaded model={model} trained on {model_date}')
+        log.info('starting API server')
+        app.run(host='0.0.0.0', port=5000, debug=False)
+    except Exception as e:
+        log.error(e)
+        sys.exit(1)

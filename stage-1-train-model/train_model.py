@@ -5,13 +5,17 @@ This module defines what will happen in 'stage-1-train-model':
 - train machine learning model and compute metrics; and,
 - save model and metrics to cloud storage (AWS S3).
 """
+import logging
+import os
 import re
+import sys
 from datetime import datetime, date
 from typing import Tuple
 
 import boto3 as aws
 import numpy as np
 import pandas as pd
+import sentry_sdk
 from botocore.exceptions import ClientError
 from joblib import dump
 from sklearn.base import BaseEstimator
@@ -19,7 +23,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_percentage_error, max_error, r2_score
 from sklearn.model_selection import train_test_split
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 
 
 def main() -> None:
@@ -50,7 +54,7 @@ def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
         )
         return pd.read_csv(object_data['Body'])
 
-    print(f'downloading all available training data from s3://{aws_bucket}/datasets')
+    log.info(f'downloading all available training data from s3://{aws_bucket}/datasets')
     try:
         s3_client = aws.client('s3')
         s3_objects = s3_client.list_objects(Bucket=aws_bucket, Prefix='datasets/')
@@ -64,7 +68,8 @@ def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
             for obj_key in ordered_dataset_objs
         )
     except ClientError as e:
-        print(f'failed to download training data from s3://{aws_bucket}/datasets')
+        log.error(e)
+        raise RuntimeError(f'failed to download training data from s3://{aws_bucket}/datasets')
     most_recent_date = object_keys_and_dates[-1][1]
     return (dataset, most_recent_date)
 
@@ -112,9 +117,10 @@ def persist_model(model: BaseEstimator, data_date: date, aws_bucket: str) -> Non
             aws_bucket,
             f'models/{model_filename}'
         )
-        print(f'uploaded {model_filename} to s3://{aws_bucket}/models/')
-    except ClientError:
-        print('could not upload model to S3 - check AWS credentials')
+        log.info(f'uploaded {model_filename} to s3://{aws_bucket}/models/')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not upload model to S3 - check AWS credentials')
 
 
 def persist_metrics(metrics: pd.DataFrame, data_date: date, aws_bucket: str) -> None:
@@ -128,10 +134,43 @@ def persist_metrics(metrics: pd.DataFrame, data_date: date, aws_bucket: str) -> 
             aws_bucket,
             f'model-metrics/{metrics_filename}'
         )
-        print(f'uploaded {metrics_filename} to s3://{aws_bucket}/model-metrics/')
-    except ClientError:
-        print('could not upload model metrics to S3 - check AWS credentials')
+        log.info(f'uploaded {metrics_filename} to s3://{aws_bucket}/model-metrics/')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not model metrics to S3 - check AWS credentials')
+
+
+def configure_logger() -> logging.Logger:
+    """Configure a logger that will write to stdout."""
+    log_handler = logging.StreamHandler(sys.stdout)
+    log_format = logging.Formatter(
+        '%(asctime)s - '
+        '%(levelname)s - '
+        '%(module)s.%(funcName)s - '
+        '%(message)s'
+    )
+    log_handler.setFormatter(log_format)
+    log = logging.getLogger(__name__)
+    log.addHandler(log_handler)
+    log.setLevel(logging.INFO)
+    return log
+
+
+def get_sentry_dsn() -> str:
+    """Get Sentry DSN from SENTRY_DSN environment variable."""
+    sentry_dsn = os.environ.get('SENTRY_DSN')
+    if sentry_dsn:
+        return sentry_dsn
+    else:
+        raise RuntimeError('cannot find SENTRY_DSN environment variable')
 
 
 if __name__ == '__main__':
-    main()
+    sentry_sdk.init(get_sentry_dsn(), traces_sample_rate=1.0)
+    sentry_sdk.set_tag('stage', 'stage-1-train-model')
+    try:
+        log = configure_logger()
+        main()
+    except Exception as e:
+        log.error(e)
+        sys.exit(1)

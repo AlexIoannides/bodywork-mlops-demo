@@ -6,7 +6,10 @@ This module defines what will happen in 'stage-4-test-model-scoring-service':
 - compares scores with labels to compute test metrics; and,
 - persists metrics to cloud storage (AWS S3).
 """
+import logging
+import os
 import re
+import sys
 from datetime import date, datetime
 from io import BytesIO
 from time import time
@@ -15,10 +18,11 @@ from typing import Dict, Tuple
 import boto3 as aws
 import pandas as pd
 import requests
+import sentry_sdk
 from botocore.exceptions import ClientError
 from requests.exceptions import ConnectionError, Timeout
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 MODEL_SCORING_SERVICE_URL = 'http://bodywork-mlops-demo--stage-2-serve-model:5000/score/v1'
 
 
@@ -38,7 +42,7 @@ def download_latest_data_file(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
         file_date = datetime.strptime(date_string, '%Y-%m-%d').date()
         return file_date
 
-    print(f'downloading latest data file from s3://{aws_bucket}/datasets')
+    log.info(f'downloading latest data file from s3://{aws_bucket}/datasets')
     try:
         s3_client = aws.client('s3')
         s3_objects = s3_client.list_objects(Bucket=aws_bucket, Prefix='datasets/')
@@ -51,8 +55,9 @@ def download_latest_data_file(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
         object_data = s3_client.get_object(Bucket=aws_bucket, Key=latest_file_obj_key)
         data = pd.read_csv(BytesIO(object_data['Body'].read()))
         dataset_date = latest_file_obj[1]
-    except ClientError:
-        print(f'failed to data file from s3://{aws_bucket}/datasets')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError(f'failed to data file from s3://{aws_bucket}/datasets')
     return (data, dataset_date)
 
 
@@ -74,6 +79,7 @@ def generate_model_test_results(url: str, test_data: pd.DataFrame) -> pd.DataFra
             else:
                 return (-1, time_taken_to_respond)
         except (ConnectionError, Timeout):
+            log.error(e)
             return (-1, -1)
 
     def _analyse_model_score(score: float, label: float) -> Tuple[float, float, float]:
@@ -120,10 +126,43 @@ def persist_test_metrics(
             aws_bucket,
             f'test-metrics/{test_metrics_filename}'
         )
-        print(f'uploaded {test_metrics_filename} to s3://{aws_bucket}/test-metrics/')
-    except ClientError:
-        print('could not upload metrics to S3 - check AWS credentials')
+        log.info(f'uploaded {test_metrics_filename} to s3://{aws_bucket}/test-metrics/')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not upload metrics to S3 - check AWS credentials')
+
+
+def configure_logger() -> logging.Logger:
+    """Configure a logger that will write to stdout."""
+    log_handler = logging.StreamHandler(sys.stdout)
+    log_format = logging.Formatter(
+        '%(asctime)s - '
+        '%(levelname)s - '
+        '%(module)s.%(funcName)s - '
+        '%(message)s'
+    )
+    log_handler.setFormatter(log_format)
+    log = logging.getLogger(__name__)
+    log.addHandler(log_handler)
+    log.setLevel(logging.INFO)
+    return log
+
+
+def get_sentry_dsn() -> str:
+    """Get Sentry DSN from SENTRY_DSN environment variable."""
+    sentry_dsn = os.environ.get('SENTRY_DSN')
+    if sentry_dsn:
+        return sentry_dsn
+    else:
+        raise RuntimeError('cannot find SENTRY_DSN environment variable')
 
 
 if __name__ == '__main__':
-    main()
+    sentry_sdk.init(get_sentry_dsn(), traces_sample_rate=1.0)
+    sentry_sdk.set_tag('stage', 'stage-4-generate-next-dataset')
+    try:
+        log = configure_logger()
+        main()
+    except Exception as e:
+        log.error(e)
+        sys.exit(1)
