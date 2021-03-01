@@ -2,11 +2,15 @@
 This module generates synthetic training data for use in
 stage-1-train-model and stage-4-test-model-scoring-service.
 """
+import logging
+import os
+import sys
 from datetime import date
 
 import boto3 as aws
 import numpy as np
 import pandas as pd
+import sentry_sdk
 from botocore.exceptions import ClientError
 
 AWS_S3_BUCKET = 'bodywork-ml-ops-project'
@@ -49,10 +53,41 @@ def persist_dataset(dataset: pd.DataFrame, aws_bucket: str) -> None:
             aws_bucket,
             f'datasets/{dataset_filename}'
         )
-        print(f'uploaded {dataset_filename} to s3://{aws_bucket}/datasets/')
+        log.info(f'uploaded {dataset_filename} to s3://{aws_bucket}/datasets/')
     except ClientError:
-        print('could not upload dataset to S3 - check AWS credentials')
+        log.error('could not upload dataset to S3 - check AWS credentials')
+
+
+def configure_logger() -> logging.Logger:
+    """Configure a logger that will write to stdout."""
+    log_handler = logging.StreamHandler(sys.stdout)
+    log_format = logging.Formatter(
+        '%(asctime)s - '
+        '%(levelname)s - '
+        '%(module)s.%(funcName)s - '
+        '%(message)s'
+    )
+    log_handler.setFormatter(log_format)
+    log = logging.getLogger(__name__)
+    log.addHandler(log_handler)
+    log.setLevel(logging.INFO)
+    return log
+
+
+def get_sentry_dsn() -> str:
+    """Get Sentry DSN from SENTRY_DSN environment variable."""
+    sentry_dsn = os.environ.get('SENTRY_DSN')
+    if sentry_dsn:
+        return sentry_dsn
+    else:
+        raise RuntimeError('cannot find SENTRY_DSN environment variable')
 
 
 if __name__ == '__main__':
-    main()
+    sentry_sdk.init(get_sentry_dsn(), traces_sample_rate=1.0)
+    sentry_sdk.set_tag('stage', 'stage-3-generate-next-dataset')
+    try:
+        log = configure_logger()
+        main()
+    except Exception as e:
+        log.error(e)
