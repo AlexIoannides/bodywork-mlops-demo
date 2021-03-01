@@ -1,6 +1,8 @@
 """
 This module generates synthetic training data for use in
 stage-1-train-model and stage-4-test-model-scoring-service.
+
+The logs are monitored by Sentry.
 """
 import logging
 import os

@@ -5,6 +5,8 @@ This module defines what will happen in 'stage-4-test-model-scoring-service':
 - scores the new data by sending requests to the model-scoring service;
 - compares scores with labels to compute test metrics; and,
 - persists metrics to cloud storage (AWS S3).
+
+The logs are monitored by Sentry.
 """
 import logging
 import os

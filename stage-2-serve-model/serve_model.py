@@ -19,6 +19,8 @@ The expected response should be,
     "prediction": 54.57560049377929,
     "model_info": "LinearRegression()"
 }
+
+The logs are monitored by Sentry.
 """
 import logging
 import os

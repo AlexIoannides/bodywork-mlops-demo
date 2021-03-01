@@ -4,6 +4,8 @@ This module defines what will happen in 'stage-1-train-model':
 - download latest dataset;
 - train machine learning model and compute metrics; and,
 - save model and metrics to cloud storage (AWS S3).
+
+The logs are monitored by Sentry.
 """
 import logging
 import os
