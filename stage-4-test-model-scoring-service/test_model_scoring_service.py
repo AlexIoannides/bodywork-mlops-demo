@@ -22,7 +22,7 @@ import sentry_sdk
 from botocore.exceptions import ClientError
 from requests.exceptions import ConnectionError, Timeout
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 MODEL_SCORING_SERVICE_URL = 'http://bodywork-mlops-demo--stage-2-serve-model:5000/score/v1'
 
 

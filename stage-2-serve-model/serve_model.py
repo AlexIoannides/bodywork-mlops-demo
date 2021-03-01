@@ -36,7 +36,7 @@ from flask import Flask, jsonify, make_response, request, Response
 from joblib import load
 from sklearn.base import BaseEstimator
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 
 app = Flask(__name__)
 

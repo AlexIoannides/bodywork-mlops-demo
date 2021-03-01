@@ -13,7 +13,7 @@ import pandas as pd
 import sentry_sdk
 from botocore.exceptions import ClientError
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 N = 24 * 60
 
 

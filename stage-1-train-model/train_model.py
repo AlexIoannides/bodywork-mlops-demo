@@ -23,7 +23,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_percentage_error, max_error, r2_score
 from sklearn.model_selection import train_test_split
 
-AWS_S3_BUCKET = 'bodywork-ml-ops-project'
+AWS_S3_BUCKET = 'bodywork-mlops-project'
 
 
 def main() -> None:
