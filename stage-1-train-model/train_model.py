@@ -68,9 +68,8 @@ def download_latest_dataset(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
             for obj_key in ordered_dataset_objs
         )
     except ClientError as e:
-        msg = f'failed to download training data from s3://{aws_bucket}/datasets' 
-        log.error(msg)
-        sentry_sdk.capture_exception(msg)
+        log.error(e)
+        raise RuntimeError(f'failed to download training data from s3://{aws_bucket}/datasets')
     most_recent_date = object_keys_and_dates[-1][1]
     return (dataset, most_recent_date)
 
@@ -119,9 +118,9 @@ def persist_model(model: BaseEstimator, data_date: date, aws_bucket: str) -> Non
             f'models/{model_filename}'
         )
         log.info(f'uploaded {model_filename} to s3://{aws_bucket}/models/')
-    except ClientError:
-        msg = 'could not upload model to S3 - check AWS credentials'
-        log.error(msg)
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not upload model to S3 - check AWS credentials')
 
 
 def persist_metrics(metrics: pd.DataFrame, data_date: date, aws_bucket: str) -> None:
@@ -136,9 +135,9 @@ def persist_metrics(metrics: pd.DataFrame, data_date: date, aws_bucket: str) -> 
             f'model-metrics/{metrics_filename}'
         )
         log.info(f'uploaded {metrics_filename} to s3://{aws_bucket}/model-metrics/')
-    except ClientError:
-        msg = 'could not model metrics to S3 - check AWS credentials'
-        log.error(msg)
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not model metrics to S3 - check AWS credentials')
 
 
 def configure_logger() -> logging.Logger:

@@ -55,8 +55,9 @@ def download_latest_data_file(aws_bucket: str) -> Tuple[pd.DataFrame, date]:
         object_data = s3_client.get_object(Bucket=aws_bucket, Key=latest_file_obj_key)
         data = pd.read_csv(BytesIO(object_data['Body'].read()))
         dataset_date = latest_file_obj[1]
-    except ClientError:
-        log.error(f'failed to data file from s3://{aws_bucket}/datasets')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError(f'failed to data file from s3://{aws_bucket}/datasets')
     return (data, dataset_date)
 
 
@@ -78,6 +79,7 @@ def generate_model_test_results(url: str, test_data: pd.DataFrame) -> pd.DataFra
             else:
                 return (-1, time_taken_to_respond)
         except (ConnectionError, Timeout):
+            log.error(e)
             return (-1, -1)
 
     def _analyse_model_score(score: float, label: float) -> Tuple[float, float, float]:
@@ -125,8 +127,9 @@ def persist_test_metrics(
             f'test-metrics/{test_metrics_filename}'
         )
         log.info(f'uploaded {test_metrics_filename} to s3://{aws_bucket}/test-metrics/')
-    except ClientError:
-        log.error('could not upload metrics to S3 - check AWS credentials')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not upload metrics to S3 - check AWS credentials')
 
 
 def configure_logger() -> logging.Logger:

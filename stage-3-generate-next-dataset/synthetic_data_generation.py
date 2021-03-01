@@ -54,8 +54,9 @@ def persist_dataset(dataset: pd.DataFrame, aws_bucket: str) -> None:
             f'datasets/{dataset_filename}'
         )
         log.info(f'uploaded {dataset_filename} to s3://{aws_bucket}/datasets/')
-    except ClientError:
-        log.error('could not upload dataset to S3 - check AWS credentials')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError('could not upload dataset to S3 - check AWS credentials')
 
 
 def configure_logger() -> logging.Logger:

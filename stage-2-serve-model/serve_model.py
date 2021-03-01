@@ -62,8 +62,9 @@ def download_latest_model(aws_bucket: str) -> Tuple[BaseEstimator, date]:
         object_data = s3_client.get_object(Bucket=aws_bucket, Key=latest_model_obj_key)
         model = load(BytesIO(object_data['Body'].read()))
         dataset_date = latest_model_obj[1]
-    except ClientError:
-        log.error(f'failed to download model from s3://{aws_bucket}/models')
+    except ClientError as e:
+        log.error(e)
+        raise RuntimeError(f'failed to download model from s3://{aws_bucket}/models')
     return (model, dataset_date)
 
 
