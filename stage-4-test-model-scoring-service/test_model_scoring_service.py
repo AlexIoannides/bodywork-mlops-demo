@@ -162,3 +162,4 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         log.error(e)
+        sys.exit(1)
