@@ -1,0 +1,83 @@
+version: "1.0"
+project:
+  name: bodywork-mlops-demo
+  docker_image: bodyworkml/bodywork-core:2.0.0
+  DAG: stage-1-train-model >> stage-2-serve-model >> stage-3-generate-next-dataset >> stage-4-test-model-scoring-service
+stages:
+  stage-1-train-model:
+    executable_module_path: mlops_simulation/stage_1_train_model.py
+    requirements:
+      - boto3==1.16.15
+      - joblib==0.17.0
+      - pandas==1.2.0
+      - numpy==1.19.5
+      - scikit-learn==0.24.0
+      - sentry-sdk==0.20.3
+    cpu_request: 0.5
+    memory_request_mb: 100
+    batch:
+      max_completion_time_seconds: 30
+      retries: 2
+    secrets:
+      AWS_ACCESS_KEY_ID: aws-credentials
+      AWS_SECRET_ACCESS_KEY: aws-credentials
+      AWS_DEFAULT_REGION: aws-credentials
+      SENTRY_DSN: sentry-integration
+  stage-2-serve-model:
+    executable_module_path: mlops_simulation/stage_2_serve_model.py
+    requirements:
+      - boto3==1.16.15
+      - Flask==1.1.2
+      - joblib==0.17.0
+      - numpy==1.19.4
+      - scikit-learn==0.24.0
+      - sentry-sdk==0.20.3
+    cpu_request: 0.25
+    memory_request_mb: 100
+    service:
+      max_startup_time_seconds: 30
+      replicas: 2
+      port: 5000
+      ingress: false
+    secrets:
+      AWS_ACCESS_KEY_ID: aws-credentials
+      AWS_SECRET_ACCESS_KEY: aws-credentials
+      AWS_DEFAULT_REGION: aws-credentials
+      SENTRY_DSN: sentry-integration
+  stage-3-generate-next-dataset:
+    executable_module_path: mlops_simulation/stage_3_synthetic_data_generation.py
+    requirements:
+      - boto3==1.16.50
+      - numpy==1.19.5
+      - pandas==1.2.0
+      - sentry-sdk==0.20.3
+    cpu_request: 0.5
+    memory_request_mb: 100
+    batch:
+      max_completion_time_seconds: 30
+      retries: 2
+    secrets:
+      AWS_ACCESS_KEY_ID: aws-credentials
+      AWS_SECRET_ACCESS_KEY: aws-credentials
+      AWS_DEFAULT_REGION: aws-credentials
+      SENTRY_DSN: sentry-integration
+  stage-4-test-model-scoring-service:
+    executable_module_path: mlops_simulation/stage_4_test_model_scoring_service.py
+    requirements:
+      - boto3==1.16.15
+      - numpy==1.19.4
+      - pandas==1.1.4
+      - requests==2.25.1
+      - sentry-sdk==0.20.3
+    cpu_request: 0.5
+    memory_request_mb: 100
+    batch:
+      max_completion_time_seconds: 30
+      retries: 2
+    secrets:
+      AWS_ACCESS_KEY_ID: aws-credentials
+      AWS_SECRET_ACCESS_KEY: aws-credentials
+      AWS_DEFAULT_REGION: aws-credentials
+      SENTRY_DSN: sentry-integration
+logging:
+  log_level: INFO
