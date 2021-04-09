@@ -1,7 +1,7 @@
 version: "1.0"
 project:
   name: bodywork-mlops-demo
-  docker_image: bodyworkml/bodywork-core:2.0.0
+  docker_image: bodyworkml/bodywork-core:2.0.2
   DAG: stage-1-train-model >> stage-2-serve-model >> stage-3-generate-next-dataset >> stage-4-test-model-scoring-service
 stages:
   stage-1-train-model:
