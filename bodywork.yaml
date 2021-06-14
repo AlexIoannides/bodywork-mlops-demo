@@ -3,7 +3,7 @@ project:
   name: bodywork-mlops-demo
   docker_image: bodyworkml/bodywork-core:2.1.1
   DAG: stage-1-train-model >> stage-2-serve-model >> stage-3-generate-next-dataset >> stage-4-test-model-scoring-service
-  project.usage_stats: false
+  usage_stats: false
 stages:
   stage-1-train-model:
     executable_module_path: mlops_simulation/stage_1_train_model.py
