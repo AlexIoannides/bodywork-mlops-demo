@@ -1,6 +1,6 @@
 boto3==1.16.50
 Flask==1.1.2
-numpy==1.19.5
+numpy==1.22.0
 pandas==1.2.0
 scikit-learn==0.24.0
 jupyterlab==3.0.3
